@@ -3,8 +3,12 @@ import { getCountryCode } from "../services/geoip";
 import { sendAlert } from "../services/webhook";
 import type { ParsedLoginAttempt } from "../parsers";
 
-// Allowed countries for normal login
-const ALLOWED_COUNTRIES = new Set(["ID", "MY", "SG"]);
+// Allowed countries for normal login (configurable, comma-separated)
+// Default: ID,MY,SG (Indonesia, Malaysia, Singapore)
+const ALLOWED_COUNTRIES_LIST = (process.env.ALLOWED_COUNTRIES || "ID,MY,SG")
+    .split(",")
+    .map(c => c.trim().toUpperCase());
+const ALLOWED_COUNTRIES = new Set(ALLOWED_COUNTRIES_LIST);
 
 /**
  * Check if a successful login is from an unusual location
