@@ -1,0 +1,16 @@
+{
+  "name": "mail-activity-detector",
+  "version": "1.0.0",
+  "description": "Web service for detecting unusual mail account activity",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.11.4"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.6",
+    "typescript": "^5.9.3"
+  }
+}

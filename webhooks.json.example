@@ -1,0 +1,10 @@
+[
+  {
+    "name": "Example Webhook",
+    "url": "https://webhook.site/your-id",
+    "method": "POST",
+    "headers": {},
+    "bodyTemplate": null,
+    "enabled": true
+  }
+]
