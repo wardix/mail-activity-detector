@@ -55,7 +55,7 @@ console.log(`
 ╚══════════════════════════════════════════════════════════════╝
 `);
 
-export default {
+Bun.serve({
     port,
     fetch: app.fetch,
-};
+});
