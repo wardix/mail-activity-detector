@@ -1,14 +1,14 @@
-import { getRecentFailedLoginCount } from "../db";
+import { getRecentFailedLoginCount, BRUTE_FORCE_WINDOW_SECONDS } from "../db";
 import { getCountryCode } from "../services/geoip";
 import { sendAlert } from "../services/webhook";
 import type { ParsedLoginAttempt } from "../parsers";
 
-// Brute force threshold
-const FAILED_LOGIN_THRESHOLD = 3;
+// Brute force threshold (configurable, default 3)
+const FAILED_LOGIN_THRESHOLD = parseInt(process.env.BRUTE_FORCE_THRESHOLD || "3", 10);
 
 /**
  * Check if there's a brute force attack from an IP
- * Triggers when 3+ failed logins occur within 10 minutes from same IP
+ * Triggers when threshold failed logins occur within window from same IP
  * Returns true if alert was sent
  */
 export async function detectBruteForce(
@@ -44,7 +44,7 @@ export async function detectBruteForce(
         details: {
             failedAttempts: failedCount + 1,
             service: attempt.service,
-            windowMinutes: 10,
+            windowSeconds: BRUTE_FORCE_WINDOW_SECONDS,
         },
     });
 

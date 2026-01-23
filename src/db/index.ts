@@ -112,8 +112,9 @@ interface LoginAttempt {
 // Store failed login attempts in memory (keyed by IP)
 const failedLoginAttempts = new Map<string, LoginAttempt[]>();
 
-// Time window for brute force detection (10 minutes)
-const BRUTE_FORCE_WINDOW_MS = 10 * 60 * 1000;
+// Time window for brute force detection (configurable, default 600 seconds = 10 minutes)
+export const BRUTE_FORCE_WINDOW_SECONDS = parseInt(process.env.BRUTE_FORCE_WINDOW_SECONDS || "600", 10);
+const BRUTE_FORCE_WINDOW_MS = BRUTE_FORCE_WINDOW_SECONDS * 1000;
 
 /**
  * Record a login attempt in memory

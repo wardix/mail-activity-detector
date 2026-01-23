@@ -2,6 +2,21 @@
   {
     "username": "admin@example.com",
     "countryCode": "US",
-    "note": "Admin travels to US frequently"
+    "note": "Admin travels frequently"
+  },
+  {
+    "username": "admin@example.com",
+    "countryCode": "AU",
+    "note": "Admin travels frequently"
+  },
+  {
+    "username": "admin@example.com",
+    "countryCode": "JP",
+    "note": "Admin travels frequently"
+  },
+  {
+    "username": "ceo@example.com",
+    "countryCode": "GB",
+    "note": "CEO based in UK"
   }
 ]
