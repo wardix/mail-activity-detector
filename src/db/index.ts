@@ -13,7 +13,8 @@ export interface WebhookConfig {
   url: string;
   method: string;
   headers: Record<string, string> | null;
-  bodyTemplate: Record<string, unknown> | string | null;  // Support object or string template
+  bodyTemplate: Record<string, unknown> | string | null;
+  alertTypes?: ("unusual_location" | "brute_force")[];  // Filter by alert type, empty/null = all
   enabled: boolean;
 }
 

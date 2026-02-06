@@ -30,6 +30,13 @@ export async function sendAlert(payload: AlertPayload): Promise<boolean> {
     let success = false;
 
     for (const webhook of webhooks) {
+        // Filter by alert type if specified
+        if (webhook.alertTypes && webhook.alertTypes.length > 0) {
+            if (!webhook.alertTypes.includes(payload.alertType)) {
+                continue;  // Skip this webhook for this alert type
+            }
+        }
+
         try {
             const body = formatWebhookBody(webhook, payload);
             const headers: Record<string, string> = {
