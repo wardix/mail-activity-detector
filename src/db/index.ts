@@ -13,7 +13,7 @@ export interface WebhookConfig {
   url: string;
   method: string;
   headers: Record<string, string> | null;
-  bodyTemplate: string | null;
+  bodyTemplate: Record<string, unknown> | string | null;  // Support object or string template
   enabled: boolean;
 }
 

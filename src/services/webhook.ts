@@ -67,6 +67,54 @@ export async function sendAlert(payload: AlertPayload): Promise<boolean> {
 }
 
 /**
+ * Get template variables for replacement
+ */
+function getTemplateVariables(payload: AlertPayload): Record<string, string> {
+    return {
+        "{{alert_type}}": payload.alertType,
+        "{{username}}": payload.username,
+        "{{ip_address}}": payload.ipAddress,
+        "{{country_code}}": payload.countryCode || "unknown",
+        "{{timestamp}}": payload.timestamp.toISOString(),
+        "{{message}}": formatAlertMessage(payload),
+    };
+}
+
+/**
+ * Replace template variables in a string
+ */
+function replaceTemplateVars(text: string, variables: Record<string, string>): string {
+    let result = text;
+    for (const [key, value] of Object.entries(variables)) {
+        result = result.replace(new RegExp(key.replace(/[{}]/g, "\\$&"), "g"), value);
+    }
+    return result;
+}
+
+/**
+ * Recursively replace template variables in an object
+ */
+function replaceTemplateInObject(obj: unknown, variables: Record<string, string>): unknown {
+    if (typeof obj === "string") {
+        return replaceTemplateVars(obj, variables);
+    }
+
+    if (Array.isArray(obj)) {
+        return obj.map(item => replaceTemplateInObject(item, variables));
+    }
+
+    if (obj !== null && typeof obj === "object") {
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[key] = replaceTemplateInObject(value, variables);
+        }
+        return result;
+    }
+
+    return obj;
+}
+
+/**
  * Format webhook body using template or default format
  */
 function formatWebhookBody(
@@ -86,21 +134,19 @@ function formatWebhookBody(
         };
     }
 
-    // Simple template replacement
+    const variables = getTemplateVariables(payload);
+
+    // Handle object template (new format)
+    if (typeof webhook.bodyTemplate === "object") {
+        return replaceTemplateInObject(webhook.bodyTemplate, variables) as Record<string, unknown>;
+    }
+
+    // Handle string template (legacy format)
     try {
-        let body = webhook.bodyTemplate;
-
-        // Replace placeholders
-        body = body.replace(/\{\{alert_type\}\}/g, payload.alertType);
-        body = body.replace(/\{\{username\}\}/g, payload.username);
-        body = body.replace(/\{\{ip_address\}\}/g, payload.ipAddress);
-        body = body.replace(/\{\{country_code\}\}/g, payload.countryCode || "unknown");
-        body = body.replace(/\{\{timestamp\}\}/g, payload.timestamp.toISOString());
-        body = body.replace(/\{\{message\}\}/g, formatAlertMessage(payload));
-
+        const body = replaceTemplateVars(webhook.bodyTemplate, variables);
         return JSON.parse(body);
-    } catch {
-        console.error(`Invalid body template for webhook ${webhook.name}`);
+    } catch (error) {
+        console.error(`Invalid body template for webhook ${webhook.name}:`, error);
         return {
             message: formatAlertMessage(payload),
         };
@@ -112,12 +158,13 @@ function formatWebhookBody(
  */
 function formatAlertMessage(payload: AlertPayload): string {
     if (payload.alertType === "unusual_location") {
-        return `🚨 Unusual Login Detected!\n\nUser: ${payload.username}\nIP: ${payload.ipAddress}\nCountry: ${payload.countryCode || "unknown"}\nTime: ${payload.timestamp.toISOString()}`;
+        return `Unusual Login Detected!\n\nUser: ${payload.username}\nIP: ${payload.ipAddress}\nCountry: ${payload.countryCode || "unknown"}\nTime: ${payload.timestamp.toISOString()}`;
     }
 
     if (payload.alertType === "brute_force") {
         const failCount = (payload.details.failedAttempts as number) || 3;
-        return `🔐 Brute Force Attack Detected!\n\nTarget: ${payload.username}\nIP: ${payload.ipAddress}\nCountry: ${payload.countryCode || "unknown"}\nFailed attempts: ${failCount} in last 10 minutes`;
+        const windowSeconds = (payload.details.windowSeconds as number) || 600;
+        return `Brute Force Attack Detected!\n\nTarget: ${payload.username}\nIP: ${payload.ipAddress}\nCountry: ${payload.countryCode || "unknown"}\nFailed attempts: ${failCount} in last ${windowSeconds} seconds`;
     }
 
     return `Alert: ${payload.alertType} for ${payload.username}`;
