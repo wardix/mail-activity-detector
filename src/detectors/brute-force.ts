@@ -1,4 +1,4 @@
-import { getRecentFailedLoginCount, BRUTE_FORCE_WINDOW_SECONDS } from "../db";
+import { getRecentFailedLoginCount, BRUTE_FORCE_WINDOW_SECONDS, isIpWhitelisted } from "../db";
 import { getCountryCode } from "../services/geoip";
 import { sendAlert } from "../services/webhook";
 import type { ParsedLoginAttempt } from "../parsers";
@@ -16,6 +16,11 @@ export async function detectBruteForce(
 ): Promise<boolean> {
     // Only check failed logins
     if (attempt.success) {
+        return false;
+    }
+
+    // Check if IP is whitelisted
+    if (isIpWhitelisted(attempt.ipAddress)) {
         return false;
     }
 

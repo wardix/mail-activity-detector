@@ -1,22 +1,24 @@
-[
-  {
-    "username": "admin@example.com",
-    "countryCode": "US",
-    "note": "Admin travels frequently"
-  },
-  {
-    "username": "admin@example.com",
-    "countryCode": "AU",
-    "note": "Admin travels frequently"
-  },
-  {
-    "username": "admin@example.com",
-    "countryCode": "JP",
-    "note": "Admin travels frequently"
-  },
-  {
-    "username": "ceo@example.com",
-    "countryCode": "GB",
-    "note": "CEO based in UK"
-  }
-]
+{
+  "accountExceptions": [
+    {
+      "username": "admin@example.com",
+      "countryCode": "US",
+      "note": "Admin travels frequently"
+    },
+    {
+      "username": "admin@example.com",
+      "countryCode": "AU",
+      "note": "Admin travels frequently"
+    }
+  ],
+  "ipWhitelist": [
+    {
+      "ip": "192.168.1.100",
+      "note": "Office mail client with misconfigured retry"
+    },
+    {
+      "ip": "10.0.0.0/8",
+      "note": "Internal network"
+    }
+  ]
+}

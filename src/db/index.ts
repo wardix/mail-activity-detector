@@ -14,7 +14,7 @@ export interface WebhookConfig {
   method: string;
   headers: Record<string, string> | null;
   bodyTemplate: Record<string, unknown> | string | null;
-  alertTypes?: ("unusual_location" | "brute_force")[];  // Filter by alert type, empty/null = all
+  alertTypes?: ("unusual_location" | "brute_force")[];
   enabled: boolean;
 }
 
@@ -39,7 +39,7 @@ export function getEnabledWebhooks(): WebhookConfig[] {
 }
 
 // ============================================
-// Account exceptions from JSON file
+// Exceptions configuration from JSON file
 // ============================================
 
 export interface AccountException {
@@ -48,14 +48,25 @@ export interface AccountException {
   note?: string;
 }
 
-let exceptionsCache: AccountException[] | null = null;
+export interface IpWhitelistEntry {
+  ip: string;
+  note?: string;
+}
+
+interface ExceptionsConfig {
+  accountExceptions?: AccountException[];
+  ipWhitelist?: IpWhitelistEntry[];
+}
+
+let exceptionsCache: ExceptionsConfig | null = null;
 let exceptionsCacheTime = 0;
 const CACHE_TTL_MS = 60 * 1000; // Reload every 1 minute
 
 /**
- * Load account exceptions from JSON file (with caching)
+ * Load exceptions from JSON file (with caching)
+ * Supports both old format (array) and new format (object with accountExceptions and ipWhitelist)
  */
-function loadExceptions(): AccountException[] {
+function loadExceptions(): ExceptionsConfig {
   const now = Date.now();
 
   // Return cached if still valid
@@ -66,19 +77,26 @@ function loadExceptions(): AccountException[] {
   try {
     if (!existsSync(EXCEPTIONS_PATH)) {
       console.warn(`Exceptions config not found: ${EXCEPTIONS_PATH}`);
-      exceptionsCache = [];
+      exceptionsCache = { accountExceptions: [], ipWhitelist: [] };
       exceptionsCacheTime = now;
-      return [];
+      return exceptionsCache;
     }
 
     const content = readFileSync(EXCEPTIONS_PATH, "utf-8");
-    exceptionsCache = JSON.parse(content) as AccountException[];
-    exceptionsCacheTime = now;
+    const parsed = JSON.parse(content);
 
+    // Support old format (array of account exceptions)
+    if (Array.isArray(parsed)) {
+      exceptionsCache = { accountExceptions: parsed, ipWhitelist: [] };
+    } else {
+      exceptionsCache = parsed as ExceptionsConfig;
+    }
+
+    exceptionsCacheTime = now;
     return exceptionsCache;
   } catch (error) {
     console.error("Failed to load exceptions config:", error);
-    return [];
+    return { accountExceptions: [], ipWhitelist: [] };
   }
 }
 
@@ -86,16 +104,124 @@ function loadExceptions(): AccountException[] {
  * Check if an account has exception for a country
  */
 export function checkAccountException(username: string, countryCode: string): boolean {
-  const exceptions = loadExceptions();
+  const config = loadExceptions();
+  const exceptions = config.accountExceptions || [];
   return exceptions.some(
     e => e.username === username && e.countryCode === countryCode
   );
 }
 
 /**
+ * Check if an IP is whitelisted from brute force detection
+ */
+export function isIpWhitelisted(ip: string): boolean {
+  const config = loadExceptions();
+  const whitelist = config.ipWhitelist || [];
+
+  return whitelist.some(entry => {
+    // Exact match
+    if (entry.ip === ip) return true;
+
+    // CIDR notation support (simple /8, /16, /24)
+    if (entry.ip.includes("/")) {
+      return matchCidr(ip, entry.ip);
+    }
+
+    return false;
+  });
+}
+
+/**
+ * CIDR matching for IPv4 and IPv6
+ */
+function matchCidr(ip: string, cidr: string): boolean {
+  const [network, prefixStr] = cidr.split("/");
+  const prefix = parseInt(prefixStr, 10);
+
+  // Detect IP version
+  const isIpv6 = ip.includes(":");
+  const isNetworkIpv6 = network.includes(":");
+
+  // Must be same IP version
+  if (isIpv6 !== isNetworkIpv6) return false;
+
+  if (isIpv6) {
+    return matchCidrV6(ip, network, prefix);
+  } else {
+    return matchCidrV4(ip, network, prefix);
+  }
+}
+
+/**
+ * IPv4 CIDR matching
+ */
+function matchCidrV4(ip: string, network: string, prefix: number): boolean {
+  const ipParts = ip.split(".").map(Number);
+  const networkParts = network.split(".").map(Number);
+
+  if (ipParts.length !== 4 || networkParts.length !== 4) return false;
+
+  // Convert to 32-bit integers
+  const ipInt = ((ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3]) >>> 0;
+  const networkInt = ((networkParts[0] << 24) | (networkParts[1] << 16) | (networkParts[2] << 8) | networkParts[3]) >>> 0;
+
+  // Create mask
+  const mask = prefix === 0 ? 0 : (~((1 << (32 - prefix)) - 1)) >>> 0;
+
+  return (ipInt & mask) === (networkInt & mask);
+}
+
+/**
+ * IPv6 CIDR matching using BigInt for 128-bit addresses
+ */
+function matchCidrV6(ip: string, network: string, prefix: number): boolean {
+  try {
+    const ipBigInt = ipv6ToBigInt(expandIpv6(ip));
+    const networkBigInt = ipv6ToBigInt(expandIpv6(network));
+
+    // Create 128-bit mask
+    const mask = prefix === 0 ? 0n : ((1n << 128n) - 1n) << BigInt(128 - prefix);
+
+    return (ipBigInt & mask) === (networkBigInt & mask);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Expand abbreviated IPv6 address to full form
+ */
+function expandIpv6(ip: string): string {
+  // Handle :: expansion
+  if (ip.includes("::")) {
+    const parts = ip.split("::");
+    const left = parts[0] ? parts[0].split(":") : [];
+    const right = parts[1] ? parts[1].split(":") : [];
+    const missing = 8 - left.length - right.length;
+    const middle = Array(missing).fill("0000");
+    const expanded = [...left, ...middle, ...right];
+    return expanded.map(p => p.padStart(4, "0")).join(":");
+  }
+
+  return ip.split(":").map(p => p.padStart(4, "0")).join(":");
+}
+
+/**
+ * Convert expanded IPv6 to BigInt
+ */
+function ipv6ToBigInt(ip: string): bigint {
+  const parts = ip.split(":");
+  let result = 0n;
+  for (const part of parts) {
+    result = (result << 16n) | BigInt(parseInt(part, 16));
+  }
+  return result;
+}
+
+/**
  * Get all exceptions (for API)
  */
-export function getAllExceptions(): AccountException[] {
+export function getAllExceptions(): ExceptionsConfig {
   return loadExceptions();
 }
 
