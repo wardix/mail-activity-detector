@@ -1,4 +1,4 @@
-import { checkAccountException } from "../db";
+import { checkAccountException, isLocationCheckSkipped } from "../db";
 import { getCountryCode } from "../services/geoip";
 import { sendAlert } from "../services/webhook";
 import type { ParsedLoginAttempt } from "../parsers";
@@ -19,6 +19,11 @@ export async function detectUnusualLocation(
 ): Promise<boolean> {
     // Only check successful logins
     if (!attempt.success) {
+        return false;
+    }
+
+    // Check if IP should skip location check (e.g., cloud provider IPs)
+    if (isLocationCheckSkipped(attempt.ipAddress)) {
         return false;
     }
 

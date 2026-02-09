@@ -56,6 +56,7 @@ export interface IpWhitelistEntry {
 interface ExceptionsConfig {
   accountExceptions?: AccountException[];
   ipWhitelist?: IpWhitelistEntry[];
+  locationCheckSkipIps?: IpWhitelistEntry[];
 }
 
 let exceptionsCache: ExceptionsConfig | null = null;
@@ -122,7 +123,27 @@ export function isIpWhitelisted(ip: string): boolean {
     // Exact match
     if (entry.ip === ip) return true;
 
-    // CIDR notation support (simple /8, /16, /24)
+    // CIDR notation support
+    if (entry.ip.includes("/")) {
+      return matchCidr(ip, entry.ip);
+    }
+
+    return false;
+  });
+}
+
+/**
+ * Check if an IP should skip location check (e.g., cloud provider IPs)
+ */
+export function isLocationCheckSkipped(ip: string): boolean {
+  const config = loadExceptions();
+  const skipList = config.locationCheckSkipIps || [];
+
+  return skipList.some(entry => {
+    // Exact match
+    if (entry.ip === ip) return true;
+
+    // CIDR notation support (IPv4 and IPv6)
     if (entry.ip.includes("/")) {
       return matchCidr(ip, entry.ip);
     }
